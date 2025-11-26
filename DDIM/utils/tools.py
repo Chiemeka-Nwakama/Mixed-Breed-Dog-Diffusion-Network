@@ -3,7 +3,7 @@ import torch
 from tqdm import tqdm
 from torchvision.utils import make_grid
 from PIL import Image
-from pathlib2 import Path
+from pathlib import Path
 import yaml
 
 

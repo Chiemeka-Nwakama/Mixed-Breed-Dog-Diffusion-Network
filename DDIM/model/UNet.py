@@ -179,6 +179,7 @@ class UNet(nn.Module):
         self.channel_mult = channel_mult
         self.conv_resample = conv_resample
         self.num_heads = num_heads
+        self.num_class = num_class
 
         # time embedding
         time_embed_dim = model_channels * 4
@@ -254,7 +255,7 @@ class UNet(nn.Module):
             nn.Conv2d(model_channels, out_channels, kernel_size=3, padding=1),
         )
 
-    def forward(self, x, timesteps):
+    def forward(self, x, timesteps, class_labels=None):
         """
         Apply the model to an input batch.
         :param x: an [N x C x H x W] Tensor of inputs.
