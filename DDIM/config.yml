@@ -3,10 +3,10 @@ Model:
   in_channels: 3
   out_channels: 3
   model_channels: 128
-  attention_resolutions: [2, ]
+  attention_resolutions: [8, 4, 2]
   num_res_blocks: 2
   dropout: 0.1
-  channel_mult: [1, 2, 2, 2]
+  channel_mult: [1, 2, 3, 4]
   conv_resample: True
   num_heads: 4
 
@@ -22,7 +22,7 @@ Dataset:
   # If mnist and cifar datasets, whether to download it.
   download: True
   # If mnist dataset, image_size is [28, 28]. If cifar dataset, image_size is [32, 32]. If custom, specify as needed.
-  image_size: [ 32, 32 ]
+  image_size: [ 128, 128]
 
   # If custom dataset, what is the mode of the image. must be one of {'RGB', 'L', 'CMYK'}.
   mode: "RGB"
@@ -46,17 +46,18 @@ Trainer:
 ### callback params
 Callback:
   # The save path for checkpoint.
-  filepath: "./checkpoint/cifar10.pth"
+  filepath: "./checkpoint/sanford.pth"
   # Frequency of checkpoint saving.
   save_freq: 1
 
 ### train params
 device: "cuda:0"
-epochs: 1000
+epochs: 300
 # Whether to continue training, True or False
 consume: False
 # If continue training, which checkpoint to load
-consume_path: "./checkpoint/cifar10.pth"
+consume_path: "./checkpoint/sanford.pth"
+
 
 ### optimizer params
-lr: 0.0002
+lr: 0.0001
