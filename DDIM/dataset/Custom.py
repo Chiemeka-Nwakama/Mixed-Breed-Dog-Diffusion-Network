@@ -1,13 +1,13 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
-from pathlib2 import Path, Iterable
+from pathlib2 import Path
 from typing import Union, Iterable
 from PIL import Image
 from torchvision import transforms
 
 
 class ImageDataset(Dataset):
-   def __init__(self, root, suffix=("jpg", "png"), transform=None):
+    def __init__(self, root, suffix=("jpg", "png"), transform=None):
         self.root = Path(root)
         self.transform = transform
         self.suffix = suffix

@@ -36,7 +36,8 @@ class GaussianDiffusionTrainer(nn.Module):
         self.register_buffer("signal_rate", torch.sqrt(alpha_t_bar))
         self.register_buffer("noise_rate", torch.sqrt(1.0 - alpha_t_bar))
 
-    def forward(self, class_labels=None, x_0):
+    def forward(self, x_0, class_labels=None):
+
         """
         Training forward pass - adds noise and predicts it
         
@@ -83,12 +84,12 @@ class DDPMSampler(nn.Module):
         self.register_buffer("posterior_variance", self.beta_t * (1.0 - alpha_t_bar_prev) / (1.0 - alpha_t_bar))
 
     @torch.no_grad()
-    def cal_mean_variance(self, x_t, t):
+    def cal_mean_variance(self, x_t, t, noise_pred):
         """
         Calculate the mean and variance for $q(x_{t-1} | x_t, x_0)$
         """
-        epsilon_theta = self.model(x_t, t)
-        mean = extract(self.coeff_1, t, x_t.shape) * x_t - extract(self.coeff_2, t, x_t.shape) * epsilon_theta
+        #epsilon_theta = self.model(x_t, t)
+        mean = (extract(self.coeff_1, t, x_t.shape) * x_t - extract(self.coeff_2, t, x_t.shape) * noise_pred)
 
         # var is a constant
         var = extract(self.posterior_variance, t, x_t.shape)
@@ -96,12 +97,12 @@ class DDPMSampler(nn.Module):
         return mean, var
 
     @torch.no_grad()
-    def sample_one_step(self, x_t, time_step: int):
+    def sample_one_step(self, x_t, time_step: int, noise_pred):
         """
         Calculate $x_{t-1}$ according to $x_t$
         """
         t = torch.full((x_t.shape[0],), time_step, device=x_t.device, dtype=torch.long)
-        mean, var = self.cal_mean_variance(x_t, t)
+        mean, var = self.cal_mean_variance(x_t, t, noise_pred)  
 
         z = torch.randn_like(x_t) if time_step > 0 else 0
         x_t_minus_one = mean + torch.sqrt(var) * z
@@ -115,7 +116,7 @@ class DDPMSampler(nn.Module):
     def forward(self, x_T, class_labels=None, guidance_scale=1.0, only_return_x_0=True, interval=1, **kwargs):
         """
         Parameters:
-            x_t: Standard Gaussian noise. A tensor with shape (batch_size, channels, height, width).
+            x_T: Standard Gaussian noise. A tensor with shape (batch_size, channels, height, width).
             only_return_x_0: Determines whether the image is saved during the sampling process. if True,
                 intermediate pictures are not saved, and only return the final result $x_0$.
             interval: This parameter is valid only when `only_return_x_0 = False`. Decide the interval at which
@@ -128,9 +129,16 @@ class DDPMSampler(nn.Module):
             otherwise, return a tensor with shape (batch_size, sample, channels, height, width),
             include intermediate pictures.
         """
+        x_t = x_T
         x = [x_t]
+
+       
         with tqdm(reversed(range(self.T)), colour="#6565b5", total=self.T) as sampling_steps:
             for time_step in sampling_steps:
+
+                # time label
+                t = torch.full((x_t.shape[0],), time_step,
+                               device=x_t.device, dtype=torch.long)
                 #Classifier-Free Guidance Noise Prediction
                 if guidance_scale > 1.0 and class_labels is not None:
                     # Conditional prediction
@@ -143,7 +151,7 @@ class DDPMSampler(nn.Module):
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
                 else:
                     noise_pred = self.model(x_t, t, class_labels)
-                 x_t = self.sample_one_step(x_t, time_step, noise_pred=noise_pred)
+                x_t = self.sample_one_step(x_t, time_step, noise_pred)
 
                 if not only_return_x_0 and ((self.T - time_step) % interval == 0 or time_step == 0):
                     x.append(torch.clip(x_t, -1.0, 1.0))
