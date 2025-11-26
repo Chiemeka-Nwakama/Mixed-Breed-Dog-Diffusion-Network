@@ -161,6 +161,7 @@ class UNet(nn.Module):
             model_channels=128,
             out_channels=3,
             num_res_blocks=2,
+            num_class = 12,
             attention_resolutions=(8, 16),
             dropout=0,
             channel_mult=(1, 2, 2, 2),
@@ -186,6 +187,17 @@ class UNet(nn.Module):
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
+
+        #Class embedding introduced into the network class represents the given dog breed
+        self.class_embed = nn.Embedding(num_class + 1, time_embed_dim)
+
+        #time and class combined
+        self.embed_combiner = nn.Sequential(
+            nn.Linear(time_embed_dim * 2, time_embed_dim),
+            nn.SiLU(),
+            nn.Linear(time_embed_dim, time_embed_dim)
+        )
+
 
         # down blocks
         self.down_blocks = nn.ModuleList([
@@ -247,11 +259,22 @@ class UNet(nn.Module):
         Apply the model to an input batch.
         :param x: an [N x C x H x W] Tensor of inputs.
         :param timesteps: a 1-D batch of timesteps.
+        :param class_labels: an [N] Tensor of class labels
         :return: an [N x C x ...] Tensor of outputs.
         """
         hs = []
         # time step embedding
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        time_emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        # Class embedding
+        if class_labels is None:
+            # Unconditional: use the extra "null" class (index = num_class)
+            class_labels = torch.full((x.shape[0],), self.num_class, 
+                                     dtype=torch.long, device=x.device)
+        
+        class_emb = self.class_embed(class_labels)
+        
+        # Combine time and class embeddings
+        emb = self.embed_combiner(torch.cat([time_emb, class_emb], dim=1))
 
         # down stage
         h = x

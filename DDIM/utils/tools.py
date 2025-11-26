@@ -15,16 +15,39 @@ def load_yaml(yml_path: Union[Path, str], encoding="utf-8"):
         return cfg
 
 
+
 def train_one_epoch(trainer, loader, optimizer, device, epoch):
     trainer.train()
     total_loss, total_num = 0., 0
 
     with tqdm(loader, dynamic_ncols=True, colour="#ff924a") as data:
-        for images, _ in data:
+     
+        for batch in data:
+            # Unpack batch - handle both (images, labels) and (images,) cases
+            if isinstance(batch, (tuple, list)) and len(batch) == 2:
+                images, labels = batch
+                labels = labels.to(device)
+            else:
+                # Fallback for datasets without labels
+                images = batch[0] if isinstance(batch, (tuple, list)) else batch
+                labels = None
+           
+            
             optimizer.zero_grad()
 
             x_0 = images.to(device)
-            loss = trainer(x_0)
+            
+            #Classifier-free guidance training
+            if labels is not None:
+                # 15% dropout: replace labels with "unconditional" class
+                drop_mask = torch.rand(labels.size(0), device=device) < 0.15
+                num_classes = trainer.model.num_class  # Get from model
+                unconditional_label = torch.tensor(num_classes, device=device)
+                labels = torch.where(drop_mask, unconditional_label, labels)
+            
+            
+            # Pass labels to trainer
+            loss = trainer(x_0, labels)  
 
             loss.backward()
             optimizer.step()
@@ -110,3 +133,10 @@ def save_sample_image(images: torch.Tensor, show: bool = True, path: Optional[st
     if show:
         im.show()
     return grid
+
+
+
+
+
+
+
