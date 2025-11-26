@@ -13,12 +13,12 @@ Model:
 ### dataset params
 Dataset:
   # Deciding which dataset to use, must be one of {'mnist', 'cifar', 'custom'}.
-  dataset: "cifar"
+  dataset: "custom"
   # If mnist and cifar datasets, whether to use the training set.
   train: True
   # Folder of data sets. When `dataset = custom`, this parameter can be a list with different folders.
   # Then all images in the list with suffixes in `suffix` in the folder will be loaded.
-  data_path: "./data"
+  data_path: "./Training Images (Sanford)"
   # If mnist and cifar datasets, whether to download it.
   download: True
   # If mnist dataset, image_size is [28, 28]. If cifar dataset, image_size is [32, 32]. If custom, specify as needed.
