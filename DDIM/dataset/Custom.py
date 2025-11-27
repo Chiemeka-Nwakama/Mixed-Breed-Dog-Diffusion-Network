@@ -4,13 +4,21 @@ from pathlib import Path
 from PIL import Image
 from torchvision import transforms
 
+import torch
+from torch.utils.data import Dataset
+from pathlib import Path
+from PIL import Image
+from torchvision import transforms
+import xml.etree.ElementTree as ET
+
 
 class ImageDataset(Dataset):
-    def __init__(self, root, suffix=("jpg", "png"), transform=None, mode="RGB"):
+    def __init__(self, root, ann_root, suffix=("jpg", "png"), transform=None, mode="RGB"):
         self.root = Path(root)
+        self.ann_root = Path(ann_root)
         self.transform = transform
         self.suffix = suffix
-        self.mode = mode  # support for different image modes
+        self.mode = mode
 
         # Find classes (subfolders)
         self.classes = sorted([d.name for d in self.root.iterdir() if d.is_dir()])
@@ -21,17 +29,42 @@ class ImageDataset(Dataset):
         for cls in self.classes:
             folder = self.root / cls
             for ext in suffix:
-                # recursive search in case there are nested subfolders
                 for img_path in folder.rglob(f"*.{ext}"):
                     self.samples.append((img_path, self.class_to_idx[cls]))
 
     def __len__(self):
         return len(self.samples)
 
+    def load_bbox(self, img_path):
+        """Load bounding box from matching XML annotation."""
+        # Example: Images/n02085620-Chihuahua/n02085620_10074.jpg
+        # Matching annotation: Annotation/n02085620-Chihuahua/n02085620_10074.xml
+        cls = img_path.parent.name
+        xml_name = img_path.stem + ".xml"
+        xml_path = self.ann_root / cls / xml_name
+
+        if not xml_path.exists():
+            return None  # fallback: no crop
+
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+
+        bbox = root.find("object").find("bndbox")
+        xmin = int(bbox.find("xmin").text)
+        ymin = int(bbox.find("ymin").text)
+        xmax = int(bbox.find("xmax").text)
+        ymax = int(bbox.find("ymax").text)
+
+        return (xmin, ymin, xmax, ymax)
+
     def __getitem__(self, idx):
         img_path, label = self.samples[idx]
-        # convert image to the specified mode (RGB/L/CMYK)
         image = Image.open(img_path).convert(self.mode)
+
+        # Load bounding box
+        bbox = self.load_bbox(img_path)
+        if bbox is not None:
+            image = image.crop(bbox)
 
         if self.transform:
             image = self.transform(image)
@@ -68,6 +101,7 @@ def create_custom_dataset(data_path, batch_size, **kwargs):
 
     dataset = ImageDataset(
         root=data_path,  # corrected parameter name
+        ann_root= Path(data_path).parent / "Annotation",
         suffix=kwargs.get("suffix", ("png", "jpg")),
         transform=trans,
         mode=mode  # support for RGB/L

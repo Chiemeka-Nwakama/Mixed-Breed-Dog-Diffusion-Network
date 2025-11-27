@@ -1,4 +1,4 @@
-from utils.engine import DDPMSampler, DDIMSampler
+from utils.engine import DDPMSampler
 from model.UNet import UNet
 import torch
 from utils.tools import save_image
@@ -9,7 +9,8 @@ def parse_option():
     parser = ArgumentParser()
     parser.add_argument("-cp", "--checkpoint_path", type=str, required=True)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--sampler", type=str, default="ddim", choices=["ddpm", "ddim"])
+    parser.add_argument("--sampler", type=str, default="ddpm", choices=["ddpm"])
+
 
     #  Mixed breed parameters
     parser.add_argument("--class_1", type=int, required=True, help="First breed class (0-11)")
@@ -49,10 +50,9 @@ def generate_mixed(args):
     model.to(device)
     model.eval()
 
-    # Create samplers for both classes
-    if args.sampler == "ddim":
-        sampler = DDIMSampler(model, **cp["config"]["Trainer"]).to(device)
-    elif args.sampler == "ddpm":
+    # Create samplers 
+    
+    if args.sampler == "ddpm":
         sampler = DDPMSampler(model, **cp["config"]["Trainer"]).to(device)
     else:
         raise ValueError(f"Unknown sampler: {args.sampler}")
