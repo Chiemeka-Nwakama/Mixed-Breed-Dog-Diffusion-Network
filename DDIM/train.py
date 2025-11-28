@@ -16,6 +16,7 @@ def train(config):
 
     device = torch.device(config["device"])
     loader = create_dataset(**config["Dataset"])
+    
     start_epoch = 1
 
     model = UNet(**config["Model"]).to(device)
