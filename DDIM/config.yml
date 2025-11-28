@@ -2,8 +2,8 @@
 Model:
   in_channels: 3
   out_channels: 3
-  model_channels: 128
-  attention_resolutions: [8, 4, 2]
+  model_channels: 256   # Increased from 128 for more representational power
+  attention_resolutions: [16, 8, 4]  # Adjusted for 64x64 images
   num_res_blocks: 2
   dropout: 0.1
   channel_mult: [1, 2, 3, 4]
@@ -20,9 +20,9 @@ Dataset:
   # Then all images in the list with suffixes in `suffix` in the folder will be loaded.
   data_path: "data/Training Images (Sanford)"
   # If mnist and cifar datasets, whether to download it.
-  download: True
+  download: False  # Set to False since custom dataset
   # If mnist dataset, image_size is [28, 28]. If cifar dataset, image_size is [32, 32]. If custom, specify as needed.
-  image_size: [ 128, 128]
+  image_size: [128, 128]
 
   # If custom dataset, what is the mode of the image. must be one of {'RGB', 'L', 'CMYK'}.
   mode: "RGB"
@@ -30,7 +30,7 @@ Dataset:
   suffix: ["png", "jpg"]
 
   # parameters for torch.utils.data.DataLoader
-  batch_size: 8
+  batch_size: 4  # Increased from 8 if GPU memory allows
   shuffle: True
   drop_last: True
   pin_memory: True
@@ -42,7 +42,6 @@ Trainer:
   T: 1000
   beta: [0.0001, 0.02]
 
-
 ### callback params
 Callback:
   # The save path for checkpoint.
@@ -52,12 +51,11 @@ Callback:
 
 ### train params
 device: "cuda:0"
-epochs: 300
+epochs: 200
 # Whether to continue training, True or False
 consume: False
 # If continue training, which checkpoint to load
 consume_path: "./checkpoint/sanford.pth"
-
 
 ### optimizer params
 lr: 0.0001
