@@ -1,97 +1,144 @@
-from utils.engine import DDPMSampler
+from utils.engine import LatentMixedBreedSampler, GradualMixedBreedSampler
 from model.UNet import UNet
 import torch
 from utils.tools import save_image
 from argparse import ArgumentParser
 
-
 def parse_option():
     parser = ArgumentParser()
     parser.add_argument("-cp", "--checkpoint_path", type=str, required=True)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--sampler", type=str, default="ddpm", choices=["ddpm"])
-
-
-    #  Mixed breed parameters
-    parser.add_argument("--class_1", type=int, required=True, help="First breed class (0-11)")
-    parser.add_argument("--class_2", type=int, required=True, help="Second breed class (0-11)")
-    parser.add_argument("--mix_ratio", type=float, default=0.5, 
-                       help="Mix ratio: 0.5=50/50, 0.7=70%% class_1 + 30%% class_2")
-    parser.add_argument("--guidance_scale", type=float, default=3.0,
-                       help="Classifier-free guidance scale (2-5 recommended)")
-  
-
-    # generator param
-    parser.add_argument("-bs", "--batch_size", type=int, default=4)
-
-    # DDIM sampler param (recommended for mixed generation)
-    parser.add_argument("--eta", type=float, default=0.0)
-    parser.add_argument("--steps", type=int, default=100)
-    parser.add_argument("--method", type=str, default="linear", choices=["linear", "quadratic"])
-
-    # save image param
-    parser.add_argument("--nrow", type=int, default=2)
+    
+    # Breed selection
+    parser.add_argument("--class_1", type=int, required=True)
+    parser.add_argument("--class_2", type=int, required=True)
+    parser.add_argument("--mix_ratio", type=float, default=0.5)
+    
+    # Sampler choice
+    parser.add_argument("--sampler", type=str, default="latent",
+                       choices=["latent", "gradual"],
+                       help="latent: 2-stage mix in latent space | gradual: smooth transition")
+    
+    # Latent sampler settings
+    parser.add_argument("--mix_timestep", type=int, default=None,
+                       help="When to mix breeds (default: T//2). Lower=later mix, higher=earlier")
+    
+    # Gradual sampler settings  
+    parser.add_argument("--blend_strategy", type=str, default="sigmoid",
+                       choices=["linear", "sigmoid", "late"],
+                       help="How to transition from separate to mixed")
+    
+    # Quality settings
+    parser.add_argument("--guidance_scale", type=float, default=5.0)
+    parser.add_argument("--use_cfg", action="store_true")
+    parser.add_argument("--use_dynamic_threshold", action="store_true")
+    
+    # Generation
+    parser.add_argument("-bs", "--batch_size", type=int, default=8)
+    parser.add_argument("--seed", type=int, default=None)
+    
+    # Save
+    parser.add_argument("--nrow", type=int, default=4)
     parser.add_argument("--show", default=False, action="store_true")
     parser.add_argument("-sp", "--image_save_path", type=str, default=None)
-
+    
     args = parser.parse_args()
     return args
 
-
 @torch.no_grad()
-def generate_mixed(args):
+def main(args):
     device = torch.device(args.device)
-
-    cp = torch.load(args.checkpoint_path)
     
-    # Load trained model
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(args.seed)
+    
+    # Load model
+    print("Loading model...")
+    cp = torch.load(args.checkpoint_path, map_location=device)
     model = UNet(**cp["config"]["Model"])
     model.load_state_dict(cp["model"])
-    model.to(device)
-    model.eval()
-
-    # Create samplers 
+    model.to(device).eval()
     
-    if args.sampler == "ddpm":
-        sampler = DDPMSampler(model, **cp["config"]["Trainer"]).to(device)
+    # Validate
+    num_classes = cp["config"]["Model"].get("num_classes", 120)
+    if not (0 <= args.class_1 < num_classes and 0 <= args.class_2 < num_classes):
+        raise ValueError(f"Classes must be in range [0, {num_classes-1}]")
+    
+    # Choose sampler
+    if args.sampler == "latent":
+        print("Using Latent-Space Mixed Sampler (2-stage approach)")
+        sampler = LatentMixedBreedSampler(model, **cp["config"]["Trainer"]).to(device)
     else:
-        raise ValueError(f"Unknown sampler: {args.sampler}")
-
-    # Generate Gaussian noise (same starting point for both)
-    z_t = torch.randn((args.batch_size, cp["config"]["Model"]["in_channels"],
-                       *cp["config"]["Dataset"]["image_size"]), device=device)
-
-    # Create class labels
-    labels_1 = torch.full((args.batch_size,), args.class_1, dtype=torch.long, device=device)
-    labels_2 = torch.full((args.batch_size,), args.class_2, dtype=torch.long, device=device)
-
-    print(f"Generating mixed breed:")
-    print(f"  {args.mix_ratio*100:.0f}% Class {args.class_1} + {(1-args.mix_ratio)*100:.0f}% Class {args.class_2}")
+        print("Using Gradual Mixed Sampler (smooth transition)")
+        sampler = GradualMixedBreedSampler(model, **cp["config"]["Trainer"]).to(device)
+    
+    # Prepare
+    image_size = cp["config"]["Dataset"]["image_size"]
+    if isinstance(image_size, int):
+        image_size = (image_size, image_size)
+    
+    z_A = torch.randn((args.batch_size, cp["config"]["Model"]["in_channels"], *image_size), device=device)
+    z_B = torch.randn_like(z_A)
+    
+    labels_A = torch.full((args.batch_size,), args.class_1, dtype=torch.long, device=device)
+    labels_B = torch.full((args.batch_size,), args.class_2, dtype=torch.long, device=device)
+    
+    print(f"\n{'='*70}")
+    print(f"Mixed Breed Generation:")
+    print(f"  Breeds: {args.mix_ratio*100:.0f}% Class {args.class_1} + "
+          f"{(1-args.mix_ratio)*100:.0f}% Class {args.class_2}")
+    print(f"  Sampler: {args.sampler}")
+    
+    if args.sampler == "latent":
+        mix_step = args.mix_timestep or cp["config"]["Trainer"]["T"] // 2
+        print(f"  Mix timestep: {mix_step} (out of {cp['config']['Trainer']['T']})")
+        print(f"    → Lower = mix later (more distinct features)")
+        print(f"    → Higher = mix earlier (more blended)")
+    else:
+        print(f"  Blend strategy: {args.blend_strategy}")
+    
     print(f"  Guidance scale: {args.guidance_scale}")
-    print(f"  Sampler: {args.sampler.upper()}")
-
-    # Generating breed with mixed conditioning
-    extra_param = dict(steps=args.steps, eta=args.eta, method=args.method)
+    print(f"  Dynamic threshold: {args.use_dynamic_threshold}")
+    print(f"{'='*70}\n")
     
-    # Generate with class 1
-    x_1 = sampler(z_t.clone(), class_labels=labels_1, guidance_scale=args.guidance_scale,
-                  only_return_x_0=True, **extra_param)
+    # Generate!
+    if args.sampler == "latent":
+        x_mixed = sampler(
+            z_A, z_B, labels_A, labels_B,
+            mix_ratio=args.mix_ratio,
+            mix_timestep=args.mix_timestep,
+            guidance_scale=args.guidance_scale,
+            use_cfg=args.use_cfg,
+            use_dynamic_threshold=args.use_dynamic_threshold,
+            only_return_x_0=True
+        )
+    else:
+        x_mixed = sampler(
+            z_A, z_B, labels_A, labels_B,
+            mix_ratio=args.mix_ratio,
+            blend_strategy=args.blend_strategy,
+            guidance_scale=args.guidance_scale,
+            use_cfg=args.use_cfg,
+            only_return_x_0=True
+        )
     
-    # Generate with class 2 (using same noise!)
-    x_2 = sampler(z_t.clone(), class_labels=labels_2, guidance_scale=args.guidance_scale,
-                  only_return_x_0=True, **extra_param)
+    # Save
+    if args.image_save_path:
+        save_path = args.image_save_path
+    else:
+        save_path = f"mixed_{args.sampler}_c{args.class_1}_c{args.class_2}_r{args.mix_ratio}_cfg{args.guidance_scale}.png"
     
-    # Mix the results
-    x_mixed = args.mix_ratio * x_1 + (1 - args.mix_ratio) * x_2
-   
-
-    # Save result
-    save_path = args.image_save_path or f"mixed_class{args.class_1}_class{args.class_2}_ratio{args.mix_ratio}.png"
     save_image(x_mixed, nrow=args.nrow, show=args.show, path=save_path)
+    print(f"\n Saved to: {save_path}")
     
-    print(f"Saved mixed breed images to: {save_path}")
-
+    # Test same-breed mixing
+    if args.class_1 == args.class_2:
+        print("\n  Note: You're mixing the same breed with itself.")
+        print("    Don’t expect improved results — the output may look the same or sometimes worse.")
+        print("     If the images degrade, that’s normal for this sampler.")
 
 if __name__ == "__main__":
     args = parse_option()
-    generate_mixed(args)
+    main(args)

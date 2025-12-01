@@ -50,11 +50,16 @@ def generate_single(args):
         sampler = DDPMSampler(model, **cp["config"]["Trainer"]).to(device)
     else:
         raise ValueError(f"Unknown sampler: {args.sampler}")
+    
+    # Handle image_size: int -> tuple
+    image_size = cp["config"]["Dataset"]["image_size"]
+    if isinstance(image_size, int):
+        image_size = (image_size, image_size)
+
 
     # Generate Gaussian noise
-    z_t = torch.randn((args.batch_size, cp["config"]["Model"]["in_channels"],
-                       *cp["config"]["Dataset"]["image_size"]), device=device)
-
+    z_t = torch.randn((args.batch_size, cp["config"]["Model"]["in_channels"], *image_size),
+                      device=device)
     # Create class labels
     labels = torch.full((args.batch_size,), args.class_1, dtype=torch.long, device=device)
 
