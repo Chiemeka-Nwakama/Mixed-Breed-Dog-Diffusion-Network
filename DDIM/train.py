@@ -72,7 +72,7 @@ def train_stage1(config):
     
     # Use separate checkpoint callback for Stage 1
     stage1_callback_config = {
-        "save_path": "./checkpoints_stage1.pth",
+        "filepath": "./checkpoints_stage1.pth",
         "save_freq": config.get("save_interval", 20)
     }
     model_checkpoint = ModelCheckpoint(**stage1_callback_config)
