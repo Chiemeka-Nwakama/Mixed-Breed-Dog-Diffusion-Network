@@ -24,7 +24,7 @@ This project builds directly on the PyTorch DDIM implementation by Zhao Di (Alok
 - Repository: https://github.com/Alokia/diffusion-DDIM-pytorch
 
 This includes the original UNet backbone, diffusion process, DDPM/DDIM samplers, and core training/sampling structure.  
-Our project adapts these components under `src/third_party/diffusion_ddim/` and extends them for conditional breed modeling.
+Our project adapts these components and extends them for conditional breed modeling and breed mixture for the Standford Dog Breed Dataset.
 
 The original DDIM paper:  
 Denoising Diffusion Implicit Models (2020) — https://arxiv.org/abs/2010.02502
