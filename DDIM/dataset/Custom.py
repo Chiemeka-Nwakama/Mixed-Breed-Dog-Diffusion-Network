@@ -4,7 +4,8 @@ from pathlib import Path
 from PIL import Image
 from torchvision import transforms
 import xml.etree.ElementTree as ET
-
+import matplotlib.pyplot as plt
+import random
 
 class ImageDataset(Dataset):
     def __init__(self, root, ann_root, suffix=("jpg", "png"), transform=None, mode="RGB"):
@@ -112,6 +113,9 @@ class ImageDataset(Dataset):
             print(f" Error loading {img_path.name}: {e}")
             # Return a random valid sample instead
             return self.__getitem__((idx + 1) % len(self.samples))
+        
+        
+
 
 
 def create_custom_dataset(data_path, batch_size, **kwargs):
@@ -152,7 +156,7 @@ def create_custom_dataset(data_path, batch_size, **kwargs):
     trans = transforms.Compose([
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(10),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+        #transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
         transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0)),
         transforms.Resize(image_size),
         transforms.ToTensor(),
@@ -199,6 +203,27 @@ def create_custom_dataset(data_path, batch_size, **kwargs):
     
     print(f"{'='*50}\n")
     
+    
+        # --- Preview 3 images from the dataset ---
+    print("Previewing 3 images from the dataset...")
+
+    # Take first 3 images
+    images, labels = zip(*[dataset[i] for i in range(3)])
+
+    # Convert to HWC + unnormalize
+    images = torch.stack(images).permute(0, 2, 3, 1).cpu().numpy()
+    images = (images * 0.5 + 0.5).clip(0, 1)
+
+    plt.figure(figsize=(10, 4))
+    for i in range(3):
+        plt.subplot(1, 3, i+1)
+        plt.imshow(images[i])
+        plt.title(dataset.classes[labels[i]])
+        plt.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -207,5 +232,10 @@ def create_custom_dataset(data_path, batch_size, **kwargs):
         pin_memory=kwargs.get("pin_memory", True),
         num_workers=kwargs.get("num_workers", 2)
     )
+    
+
+  
+   
+
     
     return dataloader
