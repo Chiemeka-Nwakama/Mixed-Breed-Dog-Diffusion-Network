@@ -80,11 +80,7 @@ def train_stage1(config):
     
     # Use separate checkpoint callback for Stage 1
     stage1_callback_config = {
-<<<<<<< HEAD:DDPM/train.py
-        "filepath": "./checkpoints_stage2.pth",
-=======
-        "filepath": "./checkpoints_stage1.pth",
->>>>>>> ea568a72e036b0a1604c3b19a59f54ee57970236:DDIM/train.py
+        "filepath": "./checkpoint/stage1_unconditional.pth",
         "save_freq": config.get("save_interval", 20)
     }
     model_checkpoint = ModelCheckpoint(**stage1_callback_config)
