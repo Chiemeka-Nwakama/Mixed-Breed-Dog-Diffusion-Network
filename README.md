@@ -249,5 +249,5 @@ This project is a collaboration of:
 - Original DDPM/DDIM sampling logic
 - Stanford Dogs dataset
 
-Extended for conditional and mixed-breed modeling in this final project.
+Extended for conditional and mixed-breed modeling.
 
