@@ -10,7 +10,7 @@ Our contributions include:
 
 - Unconditional dog generator (Stage 1)
 - Conditional fine-tuning with classifier-free guidance (Stage 2)
-- Support for three generation modes: unconditional, single-breed, and mixed-breed interpolation
+- Support for three generation modes: unconditional (general dog), single-breed, and mixed-breed interpolation
 - Expanded configuration system (config.yml)
 - Updated training pipeline and dataset loader
 - Utilities for sampling and checkpointing
