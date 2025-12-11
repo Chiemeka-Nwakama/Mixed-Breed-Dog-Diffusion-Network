@@ -122,7 +122,7 @@ def train_stage2(config, stage1_checkpoint):
     
     # Load Stage 1 model
     print(f"Loading Stage 1 checkpoint:  ./checkpoints/stage1_unconditional.pth")
-    cp = torch.load(" ./checkpoints/stage1_unconditional.pth")
+    cp = torch.load("./checkpoints/stage1_unconditional.pth")
     
     model = UNet(**config["Model"]).to(device)
     model.load_state_dict(cp["model"])
@@ -199,7 +199,7 @@ if __name__ == "__main__":
         if sys.argv[1] == "--stage1":
             train_stage1(config)
         elif sys.argv[1] == "--stage2":
-            train_stage2(config, "./checkpoints_stage1.pth")
+            train_stage2(config, "./checkpoints/stage1_unconditional.pth")
         elif sys.argv[1] == "--two-stage":
             train_two_stage(config)
     else:
