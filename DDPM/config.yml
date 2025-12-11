@@ -1,0 +1,54 @@
+device: cuda:0
+
+# Single-stage settings
+epochs: 80
+lr: 0.0001
+cfg_dropout: 0.1
+
+# Two-stage settings
+stage1_epochs: 200
+stage1_lr: 0.0001
+stage2_epochs: 80
+stage2_lr: 0.00005
+
+# Common settings
+guidance_scale: 3.0
+sample_interval: 10
+save_interval: 3
+
+consume: false
+consume_path: null
+
+Dataset:
+  data_path: "data/Training Images (Stanford)"
+  batch_size: 16
+  image_size: 128
+  mode: "RGB"
+  suffix: ["png", "jpg"]
+  shuffle: true
+  drop_last: true
+  pin_memory: true
+  num_workers: 2
+
+Model:
+  in_channels: 3
+  model_channels: 64
+  out_channels: 3
+  num_res_blocks: 2
+  num_class: 120
+  attention_resolutions: [8, 16]
+  dropout: 0.1
+  channel_mult: [1, 2, 2, 2]
+  conv_resample: true
+  num_heads: 4
+
+Trainer:
+  beta: [0.0001, 0.02]
+  T: 1000
+
+### callback params
+Callback:
+  # The save path for checkpoint.
+  filepath: "./checkpoints/unconditional/stage1_unconditional.pth"
+  # Frequency of checkpoint saving.
+  save_freq: 3
