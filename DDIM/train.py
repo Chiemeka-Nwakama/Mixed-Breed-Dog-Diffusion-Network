@@ -62,17 +62,29 @@ def train_stage1(config):
     device = torch.device(config["device"])
     loader = create_custom_dataset(**config["Dataset"])
     
-    model = UNet(**config["Model"]).to(device)
     
     lr = config.get("stage1_lr", 0.0002)
     print(f"Learning Rate: {lr}")
+    
+
+    model = UNet(**config["Model"]).to(device)
+   
+  
+    
+    cfg_dropout = config.get("cfg_dropout", 0.1)
+    
+
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     trainer = GaussianDiffusionTrainer(model, **config["Trainer"]).to(device)
     
     # Use separate checkpoint callback for Stage 1
     stage1_callback_config = {
+<<<<<<< HEAD:DDPM/train.py
+        "filepath": "./checkpoints_stage2.pth",
+=======
         "filepath": "./checkpoints_stage1.pth",
+>>>>>>> ea568a72e036b0a1604c3b19a59f54ee57970236:DDIM/train.py
         "save_freq": config.get("save_interval", 20)
     }
     model_checkpoint = ModelCheckpoint(**stage1_callback_config)
@@ -97,12 +109,10 @@ def train_stage1(config):
     
     print("\n" + "="*60)
     print("STAGE 1 COMPLETE!")
-    print(f"Best checkpoint: ./checkpoints_stage1/")
+    print(f"Final model: ", stage1_callback_config[filepath])
     print("="*60 + "\n")
-    
-    # Return path to best checkpoint
-    return "./checkpoints_stage1/best.pth"
-
+    return 
+   
 
 def train_stage2(config, stage1_checkpoint):
     """Stage 2: Conditional fine-tuning (breed-specific)"""
@@ -115,8 +125,8 @@ def train_stage2(config, stage1_checkpoint):
     loader = create_custom_dataset(**config["Dataset"])
     
     # Load Stage 1 model
-    print(f"Loading Stage 1 checkpoint: {stage1_checkpoint}")
-    cp = torch.load(stage1_checkpoint)
+    print(f"Loading Stage 1 checkpoint:  ./checkpoint/stage1_unconditional.pth")
+    cp = torch.load(" ./checkpoint/stage1_unconditional.pth")
     
     model = UNet(**config["Model"]).to(device)
     model.load_state_dict(cp["model"])
@@ -133,7 +143,7 @@ def train_stage2(config, stage1_checkpoint):
     
     # Use separate checkpoint callback for Stage 2
     stage2_callback_config = {
-        "filepath": "./checkpoints_stage2.pth",
+        "filepath": "./checkpoints_stage2_conditional.pth",
         "save_freq": config.get("save_interval", 10)
     }
     model_checkpoint = ModelCheckpoint(**stage2_callback_config)
@@ -158,9 +168,9 @@ def train_stage2(config, stage1_checkpoint):
     
     print("\n" + "="*60)
     print("STAGE 2 COMPLETE!")
-    print(f"Final model: ./checkpoints_stage2/best.pth")
+    print(f"Final model: ", stage2_callback_config[filepath])
     print("="*60 + "\n")
-
+    return
 
 def train_two_stage(config):
     """Run complete two-stage training pipeline"""
@@ -193,7 +203,7 @@ if __name__ == "__main__":
         if sys.argv[1] == "--stage1":
             train_stage1(config)
         elif sys.argv[1] == "--stage2":
-            train_stage2(config, "./checkpoint/sanford.pth")
+            train_stage2(config, "./checkpoints_stage1.pth")
         elif sys.argv[1] == "--two-stage":
             train_two_stage(config)
     else:
