@@ -80,7 +80,7 @@ def train_stage1(config):
     
     # Use separate checkpoint callback for Stage 1
     stage1_callback_config = {
-        "filepath": "./checkpoint/stage1_unconditional.pth",
+        "filepath": "./checkpoints/stage1_unconditional.pth",
         "save_freq": config.get("save_interval", 20)
     }
     model_checkpoint = ModelCheckpoint(**stage1_callback_config)
@@ -121,8 +121,8 @@ def train_stage2(config, stage1_checkpoint):
     loader = create_custom_dataset(**config["Dataset"])
     
     # Load Stage 1 model
-    print(f"Loading Stage 1 checkpoint:  ./checkpoint/stage1_unconditional.pth")
-    cp = torch.load(" ./checkpoint/stage1_unconditional.pth")
+    print(f"Loading Stage 1 checkpoint:  ./checkpoints/stage1_unconditional.pth")
+    cp = torch.load(" ./checkpoints/stage1_unconditional.pth")
     
     model = UNet(**config["Model"]).to(device)
     model.load_state_dict(cp["model"])
