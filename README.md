@@ -1,4 +1,4 @@
-# Two-Stage Conditional Diffusion Model for Dog Breed Generation
+# Two-Stage Conditional Diffusion Model for Mixed Dog Breed Generation
 CSCI 5561 / Computer Vision — Final Project - Sniffing Out the Breed: Seeing What a Computer’s Nose Knows – Dog Breed Diffusion and Development
 Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff — University of Minnesota
 
@@ -10,7 +10,7 @@ Our contributions include:
 
 - Unconditional dog generator (Stage 1)
 - Conditional fine-tuning with classifier-free guidance (Stage 2)
-- Support for three generation modes: unconditional, single-breed, and mixed-breed interpolation
+- Support for three generation modes: unconditional (general dog), single-breed, and mixed-breed interpolation
 - Expanded configuration system (config.yml)
 - Updated training pipeline and dataset loader
 - Utilities for sampling and checkpointing
@@ -24,7 +24,7 @@ This project builds directly on the PyTorch DDIM implementation by Zhao Di (Alok
 - Repository: https://github.com/Alokia/diffusion-DDIM-pytorch
 
 This includes the original UNet backbone, diffusion process, DDPM/DDIM samplers, and core training/sampling structure.  
-Our project adapts these components under `src/third_party/diffusion_ddim/` and extends them for conditional breed modeling.
+Our project adapts these components and extends them for conditional breed modeling and breed mixture for the Standford Dog Breed Dataset.
 
 The original DDIM paper:  
 Denoising Diffusion Implicit Models (2020) — https://arxiv.org/abs/2010.02502
