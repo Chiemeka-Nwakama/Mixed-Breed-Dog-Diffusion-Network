@@ -168,7 +168,7 @@ def save_image(images: torch.Tensor, nrow: int = 8, show: bool = False, path: Op
 
 def save_sample_image(images: torch.Tensor, show: bool = False, path: Optional[str] = None,
                       format: Optional[str] = None, to_grayscale: bool = False, **kwargs):
-    """Save images including intermediate diffusion steps."""
+    """Save images  intermediate diffusion steps."""
     images = images * 0.5 + 0.5
     images = torch.clamp(images, 0, 1)
 
