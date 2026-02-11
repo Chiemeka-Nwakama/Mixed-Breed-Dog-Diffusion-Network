@@ -20,7 +20,8 @@ consume: false
 consume_path: null
 
 Dataset:
-  data_path: "data/Training Images (Stanford)"
+  delta_path: "/Volumes/dogdiffusion/default/diffusion_data/silver_delta"
+  use_delta: true
   batch_size: 16
   image_size: 128
   mode: "RGB"
@@ -48,7 +49,5 @@ Trainer:
 
 ### callback params
 Callback:
-  # The save path for checkpoint.
   filepath: "./checkpoints/unconditional/stage1_unconditional.pth"
-  # Frequency of checkpoint saving.
   save_freq: 3

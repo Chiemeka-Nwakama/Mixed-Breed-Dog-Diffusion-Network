@@ -1,71 +1,86 @@
 # generate.py - generator for unconditional, single-class, and mixed-breed  dog diffusion models
 
-from argparse import ArgumentParser
+from argparse import Namespace
 import torch
 from model.UNet import UNet
 from utils.engine import DDPMSampler, GradualMixedBreedSampler
 from utils.tools import save_image
 
-
-
-# Argument Parser
+def input_bool(prompt):
+    val = input(prompt + " (y/n): ").strip().lower()
+    return val in ["y", "yes"]
 
 def parse_option():
-    parser = ArgumentParser()
+    print("Dog Diffusion Model Generator")
+    print("Select generation mode:")
+    print("1. Unconditional")
+    print("2. Single-breed conditional")
+    print("3. Mixed-breed")
+    mode = input("Enter 1, 2, or 3: ").strip()
+    unconditional = mode == "1"
+    single = mode == "2"
+    mixed = mode == "3"
 
-    # Required checkpoint
-    parser.add_argument("-cp", "--checkpoint_path", type=str, required=True)
+    checkpoint_path = input("Enter checkpoint path: ").strip()
+    device = input("Device [cuda]: ").strip() or "cuda"
 
-    # Device
-    parser.add_argument("--device", type=str, default="cuda")
+    class_1 = None
+    class_2 = None
+    mix_ratio = 0.5
 
-    # Mode flags
-    parser.add_argument("--unconditional", action="store_true",
-                        help="Unconditional generation: no labels")
+    if single or mixed:
+        class_1 = int(input("Primary class (0-N): ").strip())
+    if mixed:
+        class_2 = int(input("Secondary class (for mixed): ").strip())
+        mix_ratio = float(input("Mix ratio (fraction of class_1, 0-1) [0.5]: ").strip() or 0.5)
 
-    parser.add_argument("--single", action="store_true",
-                        help="Single-breed conditional generation")
+    guidance_scale = float(input("Guidance scale [3.0]: ").strip() or 3.0)
+    batch_size = int(input("Batch size [4]: ").strip() or 4)
+    eta = float(input("Eta [0.0]: ").strip() or 0.0)
+    steps = int(input("Steps [100]: ").strip() or 100)
+    method = input("Method [linear/quadratic]: ").strip() or "linear"
 
-    parser.add_argument("--mixed", action="store_true",
-                        help="Mixed-breed generation")
+    sampler_type = "gradual"
+    mix_timestep = None
+    blend_strategy = "sigmoid"
+    if mixed:
+        sampler_type = input("Sampler type [gradual/latent]: ").strip() or "gradual"
+        if sampler_type == "latent":
+            mix_timestep_in = input("Mix timestep (int or blank): ").strip()
+            mix_timestep = int(mix_timestep_in) if mix_timestep_in else None
+        else:
+            blend_strategy = input("Blend strategy [linear/sigmoid/late]: ").strip() or "sigmoid"
 
-    # Class inputs
-    parser.add_argument("--class_1", type=int, help="Primary class (0-N) for single or mixed")
-    parser.add_argument("--class_2", type=int, help="Secondary class (for mixed)")
-    parser.add_argument("--mix_ratio", type=float, default=0.5,
-                        help="For mixed mode: fraction of class_1")
+    use_cfg = input_bool("Use classifier-free guidance?")
+    use_dynamic_threshold = input_bool("Use dynamic thresholding?")
 
-    # Guidance
-    parser.add_argument("--guidance_scale", type=float, default=3.0)
+    nrow = int(input("nrow for image grid [2]: ").strip() or 2)
+    show = input_bool("Show image after generation?")
+    image_save_path = input("Image save path (blank for default): ").strip() or None
 
-    # Batch size
-    parser.add_argument("-bs", "--batch_size", type=int, default=4)
-
-    # Sampler settings
-    parser.add_argument("--eta", type=float, default=0.0)
-    parser.add_argument("--steps", type=int, default=100)
-    parser.add_argument("--method", type=str, default="linear",
-                        choices=["linear", "quadratic"])
-
-    # Mixed-breed sampler options
-    parser.add_argument("--sampler_type", type=str, default="gradual",
-                        choices=["gradual", "latent"])
-
-    parser.add_argument("--mix_timestep", type=int, default=None)
-    parser.add_argument("--blend_strategy", type=str, default="sigmoid",
-                        choices=["linear", "sigmoid", "late"])
-
-    parser.add_argument("--use_cfg", action="store_true")
-    parser.add_argument("--use_dynamic_threshold", action="store_true")
-
-    # Save options
-    parser.add_argument("--nrow", type=int, default=2)
-    parser.add_argument("--show", action="store_true")
-    parser.add_argument("-sp", "--image_save_path", type=str, default=None)
-
-    return parser.parse_args()
-
-
+    return Namespace(
+        checkpoint_path=checkpoint_path,
+        device=device,
+        unconditional=unconditional,
+        single=single,
+        mixed=mixed,
+        class_1=class_1,
+        class_2=class_2,
+        mix_ratio=mix_ratio,
+        guidance_scale=guidance_scale,
+        batch_size=batch_size,
+        eta=eta,
+        steps=steps,
+        method=method,
+        sampler_type=sampler_type,
+        mix_timestep=mix_timestep,
+        blend_strategy=blend_strategy,
+        use_cfg=use_cfg,
+        use_dynamic_threshold=use_dynamic_threshold,
+        nrow=nrow,
+        show=show,
+        image_save_path=image_save_path
+    )
 
 # Load model + return config
 
