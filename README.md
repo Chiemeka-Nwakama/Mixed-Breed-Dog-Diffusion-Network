@@ -342,7 +342,8 @@ Saved contents typically include:
 
 ## Credits & Acknowledgments
 - **Base implementation:** Alokia/diffusion-DDIM-pytorch  
-- **Dataset:** Stanford Dogs (120 breeds)  
+- **Dataset:** Stanford Dogs (120 breeds)
+- **Tools:** Azure, Databricks, Delta Lake, PySpark, PyTorch, Matplotlib, Numpy, torchvision, Pillow, PyYAML
 - **Extensions:** Medallion pipeline (Bronze/Silver/Gold), Delta Lake integration, two-stage training, CFG conditioning, mixed-breed interpolation, Delta-backed dataset loader  
 - **Team:** Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff
 
