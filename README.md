@@ -5,7 +5,7 @@ Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff
 ---
 
 ## Overview
-This project extends a PyTorch implementation of **Denoising Diffusion Implicit Models (DDIM)** to train a **two-stage dog-breed generator** on the **Stanford Dogs** dataset, using a **Delta Lake medallion (Bronze → Silver → Gold)** pipeline for reproducible data preparation and efficient training.
+This project extends a PyTorch implementation of **Denoising Diffusion Implicit Models (DDIM)** to train a **two-stage dog-breed generator** on the **Stanford Dogs** dataset, using a Pyspark **Delta Lake medallion (Bronze → Silver → Gold)** Azure Databricks pipeline for reproducible data preparation and efficient training.
 
 Key contributions:
 - **Data pipeline**: Medallion architecture (Bronze → Silver → Gold) backed by **Delta Lake**
