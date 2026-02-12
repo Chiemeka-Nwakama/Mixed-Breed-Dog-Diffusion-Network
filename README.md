@@ -45,7 +45,7 @@ Supported formats:
 Training preprocessing note:
 - Images are converted to **RGB** and resized to **128×128** for training (after Silver preprocessing and/or at Gold load time).
 
-Preprocessing notebook: `notebooks/data_preparation.ipynb`
+Preprocessing notebook: `Bronze To Silver Layer.py`
 
 ---
 
