@@ -1,6 +1,6 @@
 # Two-Stage Conditional Diffusion Model for Mixed Dog Breed Generation
 **Sniffing Out the Breed: Seeing What a Computer's Nose Knows – Dog Breed Diffusion and Development**  
-Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff — University of Minnesota
+Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff
 
 ---
 
