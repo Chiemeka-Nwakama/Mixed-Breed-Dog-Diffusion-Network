@@ -5,7 +5,7 @@ Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff
 ---
 
 ## Overview
-This project extends a PyTorch implementation of **Denoising Diffusion Implicit Models (DDIM)** to train a **two-stage dog-breed generator** on the **Stanford Dogs** dataset, using a Pyspark **Delta Lake medallion (Bronze → Silver → Gold)** Azure Databricks pipeline for reproducible data preparation and efficient training.
+This project extends a PyTorch implementation of **Denoising Diffusion Implicit Models (DDIM)** to train a **two-stage dog-breed generator** on the **Stanford Dogs** dataset, using a PySpark **Delta Lake medallion (Bronze → Silver → Gold)** Azure Databricks pipeline for reproducible data preparation and efficient training.
 
 Key contributions:
 - **Data pipeline**: Medallion architecture (Bronze → Silver → Gold) backed by **Delta Lake**
@@ -13,6 +13,7 @@ Key contributions:
 - **Stage 2**: Conditional fine-tuning with **classifier-free guidance**
 - **Three generation modes**: unconditional, single-breed, and mixed-breed interpolation
 - **Delta Lake integration** for dataset versioning, ACID writes, and auditability
+- **FastAPI web UI** for browser-based image generation with live progress tracking
 - Expanded configuration system (`config.yml`)
 - Updated training pipeline with `DeltaDataset` loader
 - Sampling/checkpointing utilities
@@ -30,6 +31,106 @@ Original paper: **Denoising Diffusion Implicit Models (2020)** — https://arxiv
 
 ---
 
+## Web App (FastAPI + Docker)
+
+A browser-based UI for generating dog images without needing to run Python scripts directly.
+
+### Features
+- Single-breed, mixed-breed, and random generation modes
+- Live progress bar synced to real diffusion step counts
+- Skeleton loading cards while images generate
+- Per-image download links
+- GPU and CPU support
+
+### App Preview
+
+![Mixed Breed Dog App 1](Images/Mixed%20breed%20dog%20app%201.png)
+![Mixed Breed Dog App 2](Images/Mixed%20breed%20dog%20app%202.png)
+![Mixed Breed Dog App 3](Images/Mixed%20breed%20dog%20app%203.png)
+
+---
+
+## Docker Deployment
+
+The model checkpoint is baked into the Docker image at build time — no volume mounts needed at runtime.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- For GPU support: [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+
+### Project structure (relevant files)
+```
+DDPM/
+├── Dockerfile
+├── server.py          # FastAPI app + HTML UI
+├── inference.py       # Model loading + image generation
+├── config.yml
+├── requirements.txt
+├── model/
+├── utils/
+└── checkpoints/
+    └── conditional/
+        └── stage2_conditional.pth   # baked into image at build time
+```
+
+### 1. Build the image
+
+Run from inside the `DDPM/` directory (where your `Dockerfile` lives):
+
+```bash
+docker build -t ddpm-web .
+```
+
+> The checkpoint is copied into the image during the build so you never need to mount it. Build time will be longer the first time — the `.pth` file adds to the image size.
+
+### 2. Run the container
+
+**With GPU (recommended):**
+```bash
+docker run --rm -it --name ddpm-web --gpus all -p 8081:8000 ddpm-web
+```
+
+**Without GPU (CPU only — generation will be slower):**
+```bash
+docker run --rm -it --name ddpm-web -p 8081:8000 ddpm-web
+```
+
+### 3. Open the UI
+
+| URL | What it is |
+|-----|-----------|
+| http://localhost:8081 | Main web UI |
+| http://localhost:8081/health | Health check — shows device and model status |
+
+### Stopping the container
+```bash
+docker stop ddpm-web
+```
+
+### Rebuilding after code changes
+
+If you change `server.py`, `inference.py`, or any other code file, rebuild the image:
+```bash
+docker build -t ddpm-web .
+docker run --rm -it --name ddpm-web --gpus all -p 8081:8000 ddpm-web
+```
+
+If you only change the checkpoint, rebuild too — the `.pth` is baked in at build time.
+
+### Troubleshooting
+
+**`model not loaded` on the health check** — the checkpoint path inside the container is `/checkpoints/conditional/stage2_conditional.pth`. Make sure your `Dockerfile` has:
+```dockerfile
+COPY checkpoints/conditional/stage2_conditional.pth /checkpoints/conditional/stage2_conditional.pth
+```
+and that the file exists at that path relative to your `Dockerfile`.
+
+**`--gpus all` errors** — you either don't have an NVIDIA GPU or the NVIDIA Container Toolkit isn't set up. Drop `--gpus all` to run on CPU.
+
+**Port already in use** — change `-p 8081:8000` to another port, e.g. `-p 8082:8000`, and visit http://localhost:8082.
+
+---
+
 ## Dataset
 **Stanford Dogs Dataset**
 - Breeds: 120
@@ -39,8 +140,7 @@ Original paper: **Denoising Diffusion Implicit Models (2020)** — https://arxiv
 Dataset path (raw images):
 - `data/Training Images (Stanford)`
 
-Supported formats:
-- `.jpg`, `.png`
+Supported formats: `.jpg`, `.png`
 
 Training preprocessing note:
 - Images are converted to **RGB** and resized to **128×128** for training (after Silver preprocessing and/or at Gold load time).
@@ -49,14 +149,13 @@ Preprocessing notebook: `Bronze To Silver Layer.py`
 
 ---
 
-## Data Architecture Medallion Architecture (Bronze → Silver → Gold)
+## Data Architecture — Medallion (Bronze → Silver → Gold)
 
 We implement a three-layer medallion architecture using Delta Lake to keep data transformations **traceable, reproducible, and safe**.
 
 ### Bronze (Raw)
-**Purpose:** Store the raw dataset exactly as provided.  
-**What’s in it:** original images + XML annotations (no edits).  
-**Location (example):**
+**Purpose:** Store the raw dataset exactly as provided — no edits.
+
 ```
 DDPM/data/
 ├── Training Images (Stanford)/
@@ -64,8 +163,9 @@ DDPM/data/
 ```
 
 ### Silver (Cleaned + Validated)
-**Purpose:** Clean, validate, and standardize the dataset so training is consistent.  
-**What we do:**
+**Purpose:** Clean, validate, and standardize the dataset so training is consistent.
+
+What we do:
 - Filter to valid image extensions
 - Parse breed label from folder structure
 - Parse XML to extract bounding boxes
@@ -75,7 +175,7 @@ DDPM/data/
 - Generate stable **breed → integer** label mapping (0–119)
 - Skip corrupted/unreadable files
 
-**Output schema (example):**
+Output schema (example):
 ```
 root
  |-- path: string
@@ -86,11 +186,12 @@ root
  |-- height: integer
 ```
 
-**Stored as a Delta table** (see below).
+Stored as a Delta table.
 
 ### Gold (Training-Ready)
-**Purpose:** Optimized access pattern for PyTorch training/inference.  
-**What we do at training time:**
+**Purpose:** Optimized access pattern for PyTorch training/inference.
+
+What we do at training time:
 - Read from the Delta table efficiently (batched, column-pruned reads)
 - Resize to training size (e.g., **128×128**)
 - Normalize to model input range
@@ -99,11 +200,10 @@ root
 
 ---
 
-## Why a Delta Table?
-A Delta table is used for the Silver/Gold dataset because it provides features that are helpful for an ML pipeline:
+## Why Delta Lake?
 - **ACID transactions:** prevents partial/corrupt writes during preprocessing
-- **Time travel (versioning):** lets you reproduce training runs against the exact dataset version used
-- **Audit history:** track when/why data changed (useful for debugging)
+- **Time travel (versioning):** reproduce training runs against the exact dataset version used
+- **Audit history:** track when/why data changed
 - **Schema evolution:** safely add metadata columns without breaking existing readers
 - **Concurrent read/write safety:** stable reads while new versions are being written
 
@@ -121,8 +221,12 @@ Delta table example location:
 DDPM/
 ├── README.md
 ├── config.yml
+├── Dockerfile
+├── server.py              # FastAPI web app
+├── inference.py           # Model inference + progress tracking
 ├── train.py
 ├── generate.py
+├── requirements.txt
 ├── dataset/
 │   └── DeltaDataset.py
 ├── model/
@@ -138,9 +242,9 @@ DDPM/
 │   │   └── stage1_unconditional.pth
 │   └── conditional/
 │       └── stage2_conditional.pth
-└── data/   # Bronze and Silver layer data
+└── data/
     ├── Training Images (Stanford)/
-    └── Annotation/
+    ├── Annotation/
     └── silver_delta/
 ```
 
@@ -149,44 +253,36 @@ DDPM/
 ## Breed Index Mapping
 Breed IDs range **0–119**. The mapping is generated during preprocessing and stored in the dataset table.
 
-Example:
-- 0: Chihuahua  
-- 45: Golden Retriever  
-- 67: Poodle  
-- 119: Brabancon Griffon  
+| ID | Breed |
+|----|-------|
+| 0 | Chihuahua |
+| 56 | Golden Retriever |
+| 57 | Labrador Retriever |
+| 84 | German Shepherd |
+| 99 | Siberian Husky |
+| 119 | African Hunting Dog |
 
-Full mapping:
-- Include as `breed_index.txt` (recommended) or extend this README with the complete list.
+Full mapping available in `Class Index - Breed Name Mapping` or in `server.py` as `BREED_MAP`.
 
 ---
 
-## Setup
+## Setup (without Docker)
 
 ### Prerequisites
 ```bash
-pip install torch torchvision pyspark delta-spark pillow pyyaml
+pip install torch torchvision pyspark delta-spark pillow pyyaml fastapi uvicorn
 ```
 
 ### Configuration (`config.yml`)
-Example fields:
 ```yaml
 device: cuda:0
-
-# Single-stage (optional)
-epochs: 80
-lr: 0.0001
-cfg_dropout: 0.1
-
-# Two-stage (recommended)
 stage1_epochs: 200
 stage1_lr: 0.0001
 stage2_epochs: 80
 stage2_lr: 0.00005
-
 guidance_scale: 3.0
 sample_interval: 10
 save_interval: 3
-
 data_path: "/Volumes/dogdiffusion/default/diffusion_data/silver_delta"
 use_delta: true
 batch_size: 16
@@ -196,8 +292,6 @@ shuffle: true
 drop_last: true
 pin_memory: true
 num_workers: 2
-
-# Model
 in_channels: 3
 model_channels: 64
 out_channels: 3
@@ -214,59 +308,27 @@ num_heads: 4
 
 ## Training
 
-### 1) Single-Stage Training (Optional)
-Runs combined conditional training.
-
-```bash
-python train.py
-```
-
-Default config:
-- `epochs`: 80  
-- `lr`: 0.0001  
-- `cfg_dropout`: 0.1  
-
-### 2) Two-Stage Training (Recommended)
+### Two-Stage Training (Recommended)
 
 **Stage 1 — Unconditional**
 ```bash
 python train.py --stage1
 ```
-
-Defaults:
-- `stage1_epochs`: 200  
-- `stage1_lr`: 0.0001  
-
-Checkpoint saved to:
-`./checkpoints/unconditional/stage1_unconditional.pth`
-
-Learns:
-- general dog anatomy/pose
-- fur textures/patterns
-- broad image distribution
+Learns general dog anatomy, fur textures, and the broad image distribution.  
+Checkpoint saved to: `./checkpoints/unconditional/stage1_unconditional.pth`
 
 **Stage 2 — Conditional Fine-Tuning**
 ```bash
 python train.py --stage2
 ```
+Loads from Stage 1 and learns breed-specific features, CFG conditioning, and interpolation behavior.  
+Checkpoint saved to: `./checkpoints/conditional/stage2_conditional.pth`
 
-Loads from previously unconditional model:
-`./checkpoints/unconditional/stage1_unconditional.pth`
-
-Defaults:
-| Parameter | Value |
-|----------|-------|
+| Parameter | Default |
+|-----------|---------|
 | stage2_epochs | 80 |
 | stage2_lr | 0.00005 |
 | guidance_scale | 3.0 |
-
-Checkpoint saved to:
-`./checkpoints/conditional/stage2_conditional.pth`
-
-Learns:
-- breed-specific features
-- conditional control + classifier-free guidance
-- interpolation behavior
 
 **Full Two-Stage Pipeline**
 ```bash
@@ -277,52 +339,40 @@ python train.py --two-stage
 
 ## Sampling / Image Generation
 
-### 1) Unconditional
+### CLI
 ```bash
+# Unconditional
 python generate.py --unconditional -cp stage1_unconditional.pth
-```
 
-### 2) Single-Breed
-```bash
+# Single-breed
 python generate.py --single --class_1 5 -cp stage2_conditional.pth
-```
 
-### 3) Mixed-Breed
-```bash
+# Mixed-breed
 python generate.py --mixed --class_1 3 --class_2 10 --mix_ratio 0.6 -cp stage2_conditional.pth
 ```
+
+### Web UI (Docker)
+See [Docker Deployment](#docker-deployment) above.
 
 ---
 
 ## Mixed-Breed Generation (Technical Details)
-Mixed-breed generation blends two conditional predictions **throughout** sampling using a time-dependent mixing weight.
 
-**Sigmoid mixing weight**
+Mixed-breed generation blends two conditional predictions throughout sampling using a time-dependent mixing weight.
+
+**Sigmoid mixing weight:**
 ```python
 w(t) = 1 / (1 + exp(-10 * (t/T - 0.5)))
 ```
 
-Where:
-- `t` = current timestep  
-- `T` = total sampling steps  
-
-Meaning:
-- Early steps favor Breed A
-- Later steps favor Breed B
-- Midpoint transitions smoothly
-
-**Latent mixing**
+**Latent mixing:**
 ```python
 x_t = (1 - w(t)) * xA_t + w(t) * xB_t
 ```
 
-Where:
-- `xA_t` = UNet prediction using Breed A conditioning  
-- `xB_t` = UNet prediction using Breed B conditioning  
-
 Result:
 - Structural features come from early-weighted breed
-- Texture/coloration come from later-weighted breed
+- Texture/coloration comes from later-weighted breed
 - Produces realistic mixed-breed dogs
 
 ---
@@ -331,20 +381,15 @@ Result:
 - Stage 1: `./checkpoints/unconditional/stage1_unconditional.pth`
 - Stage 2: `./checkpoints/conditional/stage2_conditional.pth`
 
-Saved contents typically include:
-- model state dict
-- optimizer state
-- epoch
-- loss history
-- config snapshot
+Saved contents typically include: model state dict, optimizer state, epoch, loss history, config snapshot.
 
 ---
 
 ## Credits & Acknowledgments
-- **Base implementation:** Alokia/diffusion-DDIM-pytorch  
+- **Base implementation:** Alokia/diffusion-DDIM-pytorch
 - **Dataset:** Stanford Dogs (120 breeds)
-- **Tools:** Azure, Databricks, Delta Lake, PySpark, PyTorch, Matplotlib, Numpy, torchvision, Pillow, PyYAML
-- **Extensions:** Medallion pipeline (Bronze/Silver/Gold), Delta Lake integration, two-stage training, CFG conditioning, mixed-breed interpolation, Delta-backed dataset loader  
+- **Tools:** Azure, Databricks, Delta Lake, PySpark, PyTorch, FastAPI, Matplotlib, NumPy, torchvision, Pillow, PyYAML
+- **Extensions:** Medallion pipeline, Delta Lake integration, two-stage training, CFG conditioning, mixed-breed interpolation, Delta-backed dataset loader, FastAPI web UI with live progress tracking
 - **Team:** Chukwuemeka Ugwu, Chiemeka Nwakama, Alec Bennyhoff
 
 ---
@@ -352,6 +397,7 @@ Saved contents typically include:
 ## Future Enhancements
 - Add incremental Delta updates and data quality monitoring
 - Higher resolution support (256×256, 512×512)
+- Multi-user support for the web UI
 
 ---
 
