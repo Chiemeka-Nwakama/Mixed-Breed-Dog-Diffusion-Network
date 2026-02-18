@@ -23,7 +23,7 @@ Dataset:
   delta_path: "/Volumes/dogdiffusion/default/diffusion_data/silver_delta"
   use_delta: true
   batch_size: 16
-  image_size: 128
+  image_size: 64
   mode: "RGB"
   suffix: ["png", "jpg"]
   shuffle: true

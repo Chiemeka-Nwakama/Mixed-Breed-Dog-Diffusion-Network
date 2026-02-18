@@ -1,0 +1,11 @@
+# Core inference deps (keep / add to match your project)
+torch
+torchvision
+numpy
+pillow
+pyyaml
+tqdm
+
+# Web service
+fastapi
+uvicorn[standard]

@@ -1,0 +1,11 @@
+.git/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+dataset/
+data/
+outputs/
+*.ipynb
+!checkpoints/
+!checkpoints/conditional/
+!checkpoints/conditional/stage2_conditional.pth
